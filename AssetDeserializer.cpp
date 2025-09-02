@@ -18,6 +18,8 @@ std::vector< char > AssetDeserializer::all_name;
 std::vector< uint16_t > AssetDeserializer::background;
 std::vector< uint16_t > AssetDeserializer::all_tile_index;
 std::vector< uint16_t > AssetDeserializer::all_palette_index;
+std::vector< int16_t > AssetDeserializer::all_offset_x;
+std::vector< int16_t > AssetDeserializer::all_offset_y;
 
 void AssetDeserializer::load(const std::string& asset_file) {
     std::ifstream input_file(asset_file);
@@ -32,6 +34,8 @@ void AssetDeserializer::load(const std::string& asset_file) {
     read_chunk(input_file, "ffff", &background);
     read_chunk(input_file, "eeea", &all_tile_index);
     read_chunk(input_file, "eeeb", &all_palette_index);
+    read_chunk(input_file, "eeec", &all_offset_x);
+    read_chunk(input_file, "eeed", &all_offset_y);
     input_file.close();
     std::cout<< "--Success-- Deserialize file finished." << std::endl;
 }

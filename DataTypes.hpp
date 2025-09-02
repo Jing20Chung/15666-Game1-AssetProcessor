@@ -15,8 +15,12 @@ struct SpriteRef {
     uint16_t palette_index_end;
     uint16_t name_index_start;
     uint16_t name_size;
+    uint16_t size_x;
+    uint16_t size_y;
+    int16_t offset_index_start;
+    int16_t offset_index_end;
 };
-static_assert(sizeof(SpriteRef) == 12, "SpriteRef is packed");
+static_assert(sizeof(SpriteRef) == 20, "SpriteRef is packed");
 
 struct SpritePiece {
     uint16_t tile_index;
@@ -24,6 +28,8 @@ struct SpritePiece {
 };
 
 struct SpriteInfo {
+    std::vector< int > size;
+    std::vector< std::vector< int > > offsets;
     std::vector< uint16_t > tile_indexes;
     std::vector< uint8_t > palette_indexes;
     std::string name;

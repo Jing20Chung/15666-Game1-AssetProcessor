@@ -196,6 +196,8 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     // Build group color coding
     std::cout<< "Build sprite group color coding " << std::endl;
     std::unordered_map< glm::u8vec4, std::vector< uint16_t > > group_map;
+    std::unordered_map< glm::u8vec4, std::vector< std::vector< int > > > group_pos_map;
+    std::unordered_map< glm::u8vec4, std::vector< std::vector< int > > > group_pos_min_max_map;
     std::unordered_set< glm::u8vec4 > seen;
     std::vector< glm::u8vec4 > ordered_color; // for name mapping
     index = 0;
@@ -208,8 +210,19 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
                 if (!seen.count(color)) {
                     seen.insert(color);
                     ordered_color.push_back(color);
+
+                    group_pos_min_max_map[color].push_back({c, c});
+                    group_pos_min_max_map[color].push_back({r, r});
+                }
+                else {
+                    group_pos_min_max_map[color][0][0] = std::min(c, group_pos_min_max_map[color][0][0]);
+                    group_pos_min_max_map[color][0][1] = std::max(c, group_pos_min_max_map[color][0][1]);
+
+                    group_pos_min_max_map[color][1][0] = std::min(r, group_pos_min_max_map[color][1][0]);
+                    group_pos_min_max_map[color][1][1] = std::max(r, group_pos_min_max_map[color][1][1]);
                 }
                 group_map[color].push_back(index);
+                group_pos_map[color].push_back({c, r});
                 index++;
             }
         }
@@ -217,15 +230,27 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
 
     // Build SpriteInfos
     std::vector< SpriteInfo > all_spriteinfo;
-    for (auto& color: ordered_color) {
-        SpriteInfo sprite;
+    for (auto& color: ordered_color) { // For name mapping
+        SpriteInfo sprite_info;
+        sprite_info.name = names[all_spriteinfo.size()];
         for (auto& sprite_piece_index: group_map[color]) {
             SpritePiece piece = all_sprite_piece[sprite_piece_index];
-            sprite.tile_indexes.push_back(piece.tile_index);
-            sprite.palette_indexes.push_back(piece.palette_index);
+            sprite_info.tile_indexes.push_back(piece.tile_index);
+            sprite_info.palette_indexes.push_back(piece.palette_index);
         }
-        sprite.name = names[all_spriteinfo.size()];
-        all_spriteinfo.push_back(sprite);
+
+        sprite_info.size = {1 + group_pos_min_max_map[color][0][1] - group_pos_min_max_map[color][0][0], 
+                            1 + group_pos_min_max_map[color][1][1] - group_pos_min_max_map[color][1][0]};
+        std::vector< int > pivot = {group_pos_map[color][0][0] + sprite_info.size[0] / 2, 
+                                                group_pos_map[color][0][1]};
+        // std::cout << "sprite name = " << sprite_info.name << std::endl;
+        // std::cout << "size x = " << sprite_info.size[0] << ", size y = " << sprite_info.size[1] << std::endl;
+        // std::cout << "pivot x = " << pivot[0] << ", pivot y = " << pivot[1] << std::endl;
+        for (auto& pos: group_pos_map[color]) {
+            sprite_info.offsets.push_back({pos[0] - pivot[0], pos[1] - pivot[1]});
+        }
+
+        all_spriteinfo.push_back(sprite_info);
     }
 
     // Save game asset
@@ -258,6 +283,8 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     std::vector< char > all_name;
     std::vector< uint16_t > all_tile_index;
     std::vector< uint16_t > all_palette_index;
+    std::vector< int16_t > all_offset_x;
+    std::vector< int16_t > all_offset_y;
 
     for (auto& info: all_spriteinfo) {
         SpriteRef ref;
@@ -274,11 +301,26 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
             all_palette_index.push_back(index);
         }
         ref.palette_index_end = all_palette_index.size() - 1;
+
+        // name
         ref.name_index_start = all_name.size();
         ref.name_size = info.name.size();
         for (char& c: info.name) {
             all_name.push_back(c);
         }
+
+        // sprite size
+        ref.size_x = info.size[0];
+        ref.size_y = info.size[1];
+
+        // tile offsets
+        ref.offset_index_start = all_offset_x.size();
+        for (auto& offset: info.offsets) {
+            all_offset_x.push_back(offset[0]);
+            all_offset_y.push_back(offset[1]);
+        }
+        ref.offset_index_end = all_offset_x.size()-1;
+
         sprite_refs.push_back(ref);
     }
 
@@ -291,6 +333,12 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     write_chunk("ffff", background, &output_file);
     write_chunk("eeea", all_tile_index, &output_file);
     write_chunk("eeeb", all_palette_index, &output_file);
+    write_chunk("eeec", all_offset_x, &output_file);
+    write_chunk("eeed", all_offset_y, &output_file);
     output_file.close();
     std::cout<< "--Success-- Build game asset finished." << std::endl;
 }
+
+// void AssetSerializer::build_offset(uint16_t x, uint16_t y, uint16_t offset_x, uint16_t offset_y, std::vector< std::vector< uint16_t > > &offsets, std::vector< glm::u8vec4 >& data, glm::u8vec4 C_DISABLED_COLOR, ) {
+
+// }
