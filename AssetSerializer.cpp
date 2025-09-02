@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <unordered_set>
 #include <unordered_map>
 #include <glm/glm.hpp>
 #include <algorithm>
@@ -15,9 +16,9 @@
 #include "data_path.hpp"
 #include "read_write_chunk.hpp"
 
-void AssetSerializer::compile_asset(const std::string& name_mapping_file, const std::string& sprite_sheet_file, const std::string& level_map_file, const std::string& color_coding_file) {
+void AssetSerializer::compile_asset(const std::string& name_mapping_file, const std::string& sprite_sheet_file, const std::string& level_map_file, const std::string& color_coding_file, const std::string& sprite_group_color_coding_file) {
     std::vector< Tile > all_tile; // all found sprite, sprite contains: tile number, palette table number, and name.
-    std::vector< SpritePiece > all_sprite; // all found sprite, sprite contains: tile number, palette table number, and name.
+    std::vector< SpritePiece > all_sprite_piece; // all found sprite, sprite contains: tile number, palette table number, and name.
     std::vector< std::vector<glm::u8vec4> > all_palette; // all found sprite, sprite contains: tile number, palette table number, and name.
 
     // comparison function for vec4
@@ -72,7 +73,7 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
             if (data[r * size.x + c] != C_DISABLED_COLOR) { // check if this block is a valid one
                 // std::cout << "data[" << r << "][" << c << "] = " << glm::to_string(data[r * size.x + c]) << std::endl;
                 // std::cout << "new sprite found, r = " << r << ", c = " << c << std::endl;
-                SpritePiece curr_sprite;
+                SpritePiece curr_sprite_piece;
                 Tile curr_tile;
                 std::vector< glm::u8vec4 > colors;
                 assert(r + 7 < size.y && c + 7 < size.x && "Invalid pixel count of a tile");
@@ -137,10 +138,10 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
                 }
                 // all_palette.push_back(colors);
                 all_tile.push_back(curr_tile);
-                curr_sprite.tile_index = all_tile.size() - 1;
-                curr_sprite.palette_index = palette_index;
-                curr_sprite.name = names[all_sprite.size()];
-                all_sprite.push_back(curr_sprite);
+                curr_sprite_piece.tile_index = all_tile.size() - 1;
+                curr_sprite_piece.palette_index = palette_index;
+                //curr_sprite_piece.name = names[all_sprite_piece.size()];
+                all_sprite_piece.push_back(curr_sprite_piece);
 
                 c += 7; // skip following 7 pixels.
             }
@@ -158,7 +159,7 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
             glm::u8vec4 color = data[r * size.x + c];
             if (color != C_DISABLED_COLOR) {
                 assert(color_sprite_map.find(color) == color_sprite_map.end() && "Duplicate color for different sprite!");
-                color_sprite_map[color] = all_sprite[index++];
+                color_sprite_map[color] = all_sprite_piece[index++];
             }
         }
     }
@@ -190,7 +191,42 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
             background.push_back(cur_sprite_piece.palette_index << 8 | cur_sprite_piece.tile_index);
             index++;
         }
-    }   
+    }
+
+    // Build group color coding
+    std::cout<< "Build sprite group color coding " << std::endl;
+    std::unordered_map< glm::u8vec4, std::vector< uint16_t > > group_map;
+    std::unordered_set< glm::u8vec4 > seen;
+    std::vector< glm::u8vec4 > ordered_color; // for name mapping
+    std::cout<< "load png success, size is " << size.x << ", "<< size.y << std::endl;
+    index = 0;
+    load_png(sprite_group_color_coding_file, &size, &data, OriginLocation::LowerLeftOrigin);
+    for (int r = 0; r < size.y; r+=8) {
+        for (int c = 0; c < size.x; c+=8) {
+            glm::u8vec4 color = data[r * size.x + c];
+            if (color != C_DISABLED_COLOR) { 
+                if (!seen.count(color)) {
+                    seen.insert(color);
+                    ordered_color.push_back(color);
+                }
+                group_map[color].push_back(index);
+                index++;
+            }
+        }
+    }
+
+    // Build MySprites
+    std::vector< MySprite > all_sprites;
+    for (auto& color: ordered_color) {
+        MySprite sprite;
+        for (auto& sprite_piece_index: group_map[color]) {
+            SpritePiece piece = all_sprite_piece[sprite_piece_index];
+            sprite.tile_indexs.push_back(piece.tile_index);
+            sprite.palette_indexs.push_back(piece.palette_index);
+        }
+        sprite.name = names[all_sprites.size()];
+        all_sprites.push_back(sprite);
+    }
 
     // Save game asset
     // Prepare data
@@ -220,6 +256,9 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     // Build sprite refs
     std::vector< SpriteRef > sprite_refs;
     std::vector< char > all_name;
+    std::vector< uint16_t > all_tile_index;
+    std::vector< uint16_t > all_palette_index;
+
     // TODO
     // for (auto& sprite: all_sprite) {
     //     SpriteRef ref;
