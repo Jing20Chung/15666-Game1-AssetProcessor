@@ -20,6 +20,32 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     std::vector< Sprite > all_sprite; // all found sprite, sprite contains: tile number, palette table number, and name.
     std::vector< std::vector<glm::u8vec4> > all_palette; // all found sprite, sprite contains: tile number, palette table number, and name.
 
+    // comparison function for vec4
+    // reference: https://stackoverflow.com/questions/1380463/how-do-i-sort-a-vector-of-custom-objects
+    struct ascend_comparison
+    {
+        inline bool operator() (const glm::u8vec4& color_a, const glm::u8vec4& color_b)
+        {
+            if (color_a.x != color_b.x) {
+                return (color_a.x < color_b.x);
+            }
+            else if (color_a.y != color_b.y) {
+                return (color_a.y < color_b.y);
+                
+            }
+            else if (color_a.z != color_b.z) {
+                return (color_a.z < color_b.z);
+                
+            }
+            else if (color_a.a != color_b.a) {
+                return (color_a.a < color_b.a);
+            }
+            else {
+                return false;
+            }
+        }
+    };
+
     // read name file
     std::vector< std::string > names;
     std::ifstream name_file(name_mapping_file);
@@ -53,22 +79,50 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
 
                 // collect color in the 8*8 grid
                 for (uint32_t sr = r; sr < r + 8; sr++) {
+                    for (uint32_t sc = c; sc < c + 8; sc++) {
+                        glm::u8vec4 *color = &data[sr * size.x + sc];
+                        auto ptr = std::find(colors.begin(), colors.end(), *color);
+                        if (ptr == colors.end()) {
+                            assert(colors.size() < 4 && "tile palette packed.");
+                            colors.push_back(*color);
+                        }
+                    }
+                }
+
+                // make sure each palette set has size of 4
+                while (colors.size() < 4) {
+                    colors.push_back(C_DUMMY_COLOR);
+                }
+
+                // sort current palette
+                std::sort(colors.begin(), colors.end(), ascend_comparison());
+                
+                // get correct all_palette index
+                uint8_t palette_index = 10;
+                for (uint8_t i = 0; i < all_palette.size(); i++) {
+                    if (colors == all_palette[i]) { // color exists
+                        palette_index = i;
+                        break;
+                    }
+                }
+
+                // new palette
+                if (palette_index == 10) {
+                    assert( all_palette.size() < 8 && "palette packed.");
+                    all_palette.push_back(colors);
+                    palette_index = all_palette.size() - 1;
+                }
+                
+                // Build tile map
+                for (uint32_t sr = r; sr < r + 8; sr++) {
                     // init tile bitmap
                     uint8_t cur_tile_row_bit0 = 0b00000000;
                     uint8_t cur_tile_row_bit1 = 0b00000000;
                     for (uint32_t sc = c; sc < c + 8; sc++) {
                         glm::u8vec4 *color = &data[sr * size.x + sc];
                         auto ptr = std::find(colors.begin(), colors.end(), *color);
-                        int idx = 0; // palette index of this grid.
-                        if (ptr == colors.end()) { // new color in a 8*8 grid
-                            assert(colors.size() < 4 && "tile palette packed.");
-                            colors.push_back(*color);
-                            idx = colors.size() - 1;
-                            // std::cout << "new color added, color = " << glm::to_string(*color) << std::endl;
-                        }
-                        else { // existing color in current grid
-                            idx = ptr - colors.begin();
-                        }
+                        assert(ptr != colors.end() && "color should exists in colors.");
+                        int idx = ptr - colors.begin(); // palette index of this grid.
 
                         // build tile bitmap of this row
                         cur_tile_row_bit0 <<= 1;
@@ -82,14 +136,49 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
                     curr_tile.bit1[sr - r] = cur_tile_row_bit1;
                 }
 
-                // make sure each palette set has size of 4
-                while (colors.size() < 4) {
-                    colors.push_back(C_DUMMY_COLOR);
-                }
-                all_palette.push_back(colors);
+                // for (uint32_t sr = r; sr < r + 8; sr++) {
+                //     // init tile bitmap
+                //     uint8_t cur_tile_row_bit0 = 0b00000000;
+                //     uint8_t cur_tile_row_bit1 = 0b00000000;
+                //     for (uint32_t sc = c; sc < c + 8; sc++) {
+                //         glm::u8vec4 *color = &data[sr * size.x + sc];
+                //         auto ptr = std::find(colors.begin(), colors.end(), *color);
+                //         int idx = 0; // palette index of this grid.
+                //         if (ptr == colors.end()) { // new color in a 8*8 grid
+                //             assert(colors.size() < 4 && "tile palette packed.");
+                //             colors.push_back(*color);
+                //             idx = colors.size() - 1;
+                //             // std::cout << "new color added, color = " << glm::to_string(*color) << std::endl;
+                //         }
+                //         else { // existing color in current grid
+                //             idx = ptr - colors.begin();
+                //         }
+
+                //         // build tile bitmap of this row
+                //         cur_tile_row_bit0 <<= 1;
+                //         cur_tile_row_bit0 |= idx % 2;
+                //         cur_tile_row_bit1 <<= 1;
+                //         cur_tile_row_bit1 |= idx / 2;
+                //         data[sr * size.x + sc] = C_DISABLED_COLOR; // mark as seen using disabled color
+                //     }
+                //     // assign tile bit map
+                //     curr_tile.bit0[sr - r] = cur_tile_row_bit0;
+                //     curr_tile.bit1[sr - r] = cur_tile_row_bit1;
+                // }
+
+                // // make sure each palette set has size of 4
+                // while (colors.size() < 4) {
+                //     colors.push_back(C_DUMMY_COLOR);
+                // }
+
+
+
+
+
+                // all_palette.push_back(colors);
                 all_tile.push_back(curr_tile);
                 curr_sprite.tile_index = all_tile.size() - 1;
-                curr_sprite.palette_index = all_palette.size() - 1;
+                curr_sprite.palette_index = palette_index;
                 curr_sprite.name = names[all_sprite.size()];
                 all_sprite.push_back(curr_sprite);
 
@@ -147,8 +236,11 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     // Prepare data
     // flattern palettes
     std::vector< glm::u8vec4 > flat_palette;
+    index = 0;
     for (auto& palette_set: all_palette) {
+        std::cout << "palette index: " << index++ << std::endl;
         for (auto& color: palette_set) {
+            std::cout << "color: " << glm::to_string(color) << std::endl;
             flat_palette.push_back(color);
         }
     }
