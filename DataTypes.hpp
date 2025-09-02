@@ -21,12 +21,11 @@ static_assert(sizeof(SpriteRef) == 12, "SpriteRef is packed");
 struct SpritePiece {
     uint16_t tile_index;
     uint8_t palette_index;
-    std::string name;
 };
 
-struct MySprite {
-    std::vector< uint16_t > tile_indexs;
-    std::vector< uint8_t > palette_indexs;
+struct SpriteInfo {
+    std::vector< uint16_t > tile_indexes;
+    std::vector< uint8_t > palette_indexes;
     std::string name;
 };
 

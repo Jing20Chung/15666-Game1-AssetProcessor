@@ -16,6 +16,8 @@ std::vector< uint8_t > AssetDeserializer::flat_tile_bit1;
 std::vector< SpriteRef > AssetDeserializer::sprite_refs;
 std::vector< char > AssetDeserializer::all_name;
 std::vector< uint16_t > AssetDeserializer::background;
+std::vector< uint16_t > AssetDeserializer::all_tile_index;
+std::vector< uint16_t > AssetDeserializer::all_palette_index;
 
 void AssetDeserializer::load(const std::string& asset_file) {
     std::ifstream input_file(asset_file);
@@ -28,6 +30,8 @@ void AssetDeserializer::load(const std::string& asset_file) {
     read_chunk(input_file, "dddd", &all_name);
     read_chunk(input_file, "eeee", &sprite_refs);
     read_chunk(input_file, "ffff", &background);
+    read_chunk(input_file, "eeea", &all_tile_index);
+    read_chunk(input_file, "eeeb", &all_palette_index);
     input_file.close();
     std::cout<< "--Success-- Deserialize file finished." << std::endl;
 }

@@ -180,9 +180,9 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     //            '-------------------- unused (set to zero)
     std::cout<< "Build background " << std::endl;
     std::vector< uint16_t > background;
-    std::cout<< "load png success, size is " << size.x << ", "<< size.y << std::endl;
     index = 0;
     load_png(level_map_file, &size, &data, OriginLocation::LowerLeftOrigin);
+    std::cout<< "load png success, size is " << size.x << ", "<< size.y << std::endl;
     for (int r = 0; r < size.y; r+=8) {
         for (int c = 0; c < size.x; c+=8) {
             glm::u8vec4 color = data[r * size.x + c];
@@ -198,9 +198,9 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     std::unordered_map< glm::u8vec4, std::vector< uint16_t > > group_map;
     std::unordered_set< glm::u8vec4 > seen;
     std::vector< glm::u8vec4 > ordered_color; // for name mapping
-    std::cout<< "load png success, size is " << size.x << ", "<< size.y << std::endl;
     index = 0;
     load_png(sprite_group_color_coding_file, &size, &data, OriginLocation::LowerLeftOrigin);
+    std::cout<< "load png success, size is " << size.x << ", "<< size.y << std::endl;
     for (int r = 0; r < size.y; r+=8) {
         for (int c = 0; c < size.x; c+=8) {
             glm::u8vec4 color = data[r * size.x + c];
@@ -215,17 +215,17 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
         }
     }
 
-    // Build MySprites
-    std::vector< MySprite > all_sprites;
+    // Build SpriteInfos
+    std::vector< SpriteInfo > all_spriteinfo;
     for (auto& color: ordered_color) {
-        MySprite sprite;
+        SpriteInfo sprite;
         for (auto& sprite_piece_index: group_map[color]) {
             SpritePiece piece = all_sprite_piece[sprite_piece_index];
-            sprite.tile_indexs.push_back(piece.tile_index);
-            sprite.palette_indexs.push_back(piece.palette_index);
+            sprite.tile_indexes.push_back(piece.tile_index);
+            sprite.palette_indexes.push_back(piece.palette_index);
         }
-        sprite.name = names[all_sprites.size()];
-        all_sprites.push_back(sprite);
+        sprite.name = names[all_spriteinfo.size()];
+        all_spriteinfo.push_back(sprite);
     }
 
     // Save game asset
@@ -259,18 +259,28 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     std::vector< uint16_t > all_tile_index;
     std::vector< uint16_t > all_palette_index;
 
-    // TODO
-    // for (auto& sprite: all_sprite) {
-    //     SpriteRef ref;
-    //     ref.tile_index = sprite.tile_index;
-    //     ref.palette_index = sprite.palette_index;
-    //     ref.name_index_start = all_name.size();
-    //     ref.name_size = sprite.name.size();
-    //     for (char& c: sprite.name) {
-    //         all_name.push_back(c);
-    //     }
-    //     sprite_refs.push_back(ref);
-    // }
+    for (auto& info: all_spriteinfo) {
+        SpriteRef ref;
+        // Tile index
+        ref.tile_index_start = all_tile_index.size();
+        for (auto& index: info.tile_indexes) {
+            all_tile_index.push_back(index);
+        }
+        ref.tile_index_end = all_tile_index.size() - 1;
+
+        // Palette index
+        ref.palette_index_start = all_palette_index.size();
+        for (auto& index: info.palette_indexes) {
+            all_palette_index.push_back(index);
+        }
+        ref.palette_index_end = all_palette_index.size() - 1;
+        ref.name_index_start = all_name.size();
+        ref.name_size = info.name.size();
+        for (char& c: info.name) {
+            all_name.push_back(c);
+        }
+        sprite_refs.push_back(ref);
+    }
 
     std::ofstream output_file(data_path("game.asset"));
     write_chunk("aaaa", flat_palette, &output_file);
@@ -279,6 +289,8 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
     write_chunk("dddd", all_name, &output_file);
     write_chunk("eeee", sprite_refs, &output_file);
     write_chunk("ffff", background, &output_file);
+    write_chunk("eeea", all_tile_index, &output_file);
+    write_chunk("eeeb", all_palette_index, &output_file);
     output_file.close();
     std::cout<< "--Success-- Build game asset finished." << std::endl;
 }

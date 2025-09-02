@@ -11,5 +11,7 @@ struct AssetDeserializer {
     static std::vector< SpriteRef > sprite_refs;
     static std::vector< char > all_name;
     static std::vector< uint16_t > background;
+    static std::vector< uint16_t > all_tile_index;
+    static std::vector< uint16_t > all_palette_index;
     static void load(const std::string& asset_file);
 };
