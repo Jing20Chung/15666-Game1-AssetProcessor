@@ -243,9 +243,9 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
                             1 + group_pos_min_max_map[color][1][1] - group_pos_min_max_map[color][1][0]};
         std::vector< int > pivot = {group_pos_map[color][0][0] + sprite_info.size[0] / 2, 
                                                 group_pos_map[color][0][1]};
-        // std::cout << "sprite name = " << sprite_info.name << std::endl;
-        // std::cout << "size x = " << sprite_info.size[0] << ", size y = " << sprite_info.size[1] << std::endl;
-        // std::cout << "pivot x = " << pivot[0] << ", pivot y = " << pivot[1] << std::endl;
+        std::cout << "sprite name = " << sprite_info.name << std::endl;
+        std::cout << "size x = " << sprite_info.size[0] << ", size y = " << sprite_info.size[1] << std::endl;
+        std::cout << "pivot x = " << pivot[0] << ", pivot y = " << pivot[1] << std::endl;
         for (auto& pos: group_pos_map[color]) {
             sprite_info.offsets.push_back({pos[0] - pivot[0], pos[1] - pivot[1]});
         }
@@ -319,7 +319,7 @@ void AssetSerializer::compile_asset(const std::string& name_mapping_file, const 
             all_offset_x.push_back(offset[0]);
             all_offset_y.push_back(offset[1]);
         }
-        ref.offset_index_end = all_offset_x.size()-1;
+        ref.offset_index_end = all_offset_x.size() - 1;
 
         sprite_refs.push_back(ref);
     }
